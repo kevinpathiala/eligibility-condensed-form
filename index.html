@@ -1103,7 +1103,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
     border-radius: 0;
     box-shadow: none;
     padding: 26px 26px 22px !important;
-    min-height: 540px;
+    min-height: 0;
     display: flex;
     flex-direction: column;
     overflow: hidden;
@@ -1121,7 +1121,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
   #beehive-form .progress-wrap { padding: 0 0 6px !important; }
   #beehive-form .restart-row { padding: 0 0 6px !important; }
   #beehive-form .main {
-    flex: 1;
+    flex: 0 0 auto;
     padding: 10px 0 8px !important;
     max-width: none !important;
     margin: 0 !important;
@@ -1141,7 +1141,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
   .card-sub { font-size: 15px; color: var(--text-muted); line-height: 1.5; margin: 0; text-wrap: pretty; }
   @media (max-width: 520px) {
     #beehive-form { padding: 0; }
-    #beehive-form .stage { padding: 22px 20px 20px !important; min-height: 500px; }
+    #beehive-form .stage { padding: 22px 20px 20px !important; min-height: 0; }
   }
 
   /* Preset chips under sliders — tap instead of drag */
@@ -2525,7 +2525,7 @@ const DEFAULT_DATA = {
 // ============================================================================
 const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
   "theme": "light",
-  "progressStyle": "stepper",
+  "progressStyle": "bar",
   "accent": "#E00800"
 }/*EDITMODE-END*/;
 
@@ -2550,15 +2550,15 @@ const App = () => {
   const [errors, setErrors] = useState({});
   const [submitting, setSubmitting] = useState(false);
   const [done, setDone] = useState(null);
+  const [contactPage, setContactPage] = useState(0);
 
   const steps = useMemo(() => ([
     { id: 'age', component: StepAge, isValid: () => !!data.businessAge },
     { id: 'sector', component: StepSectorIndustry, isValid: () => !!data.sector && !!data.industry },
     { id: 'revenue', component: StepRevenue, isValid: () => !!data.revenueTouched },
     { id: 'loan', component: StepLoan, isValid: () => !!data.loanTouched },
-    { id: 'contact', component: StepContactA, isValid: () => Object.keys(validateContactA(data)).length === 0 },
-    { id: 'contact2', component: StepContactB, isValid: () => Object.keys(validateContactB(data)).length === 0 },
-  ]), [data]);
+    { id: 'contact', component: contactPage === 0 ? StepContactA : StepContactB, isValid: () => contactPage === 0 ? Object.keys(validateContactA(data)).length === 0 : Object.keys(validateContactB(data)).length === 0 },
+  ]), [data, contactPage]);
 
   const total = steps.length;
   const current = steps[stepIdx];
@@ -2573,12 +2573,13 @@ const App = () => {
   }, [stepIdx, total, steps]);
 
   const back = useCallback(() => {
+    if (steps[stepIdx] && steps[stepIdx].id === 'contact' && contactPage === 1) { setContactPage(0); setErrors({}); return; }
     if (stepIdx > 0) {
       let i = stepIdx - 1;
       while (i > 0 && steps[i].skip && steps[i].skip()) i--;
       setStepIdx(i); setErrors({});
     }
-  }, [stepIdx, steps]);
+  }, [stepIdx, steps, contactPage]);
 
   const handleSubmit = async () => {
     const v = validateContact(data);
@@ -2597,7 +2598,14 @@ const App = () => {
   };
 
   const handleNext = () => {
-    if (current.id === 'contact2') return handleSubmit();
+    if (current.id === 'contact') {
+      if (contactPage === 0) {
+        const v = validateContactA(data);
+        if (Object.keys(v).length) { setErrors(v); return; }
+        setContactPage(1); setErrors({}); return;
+      }
+      return handleSubmit();
+    }
     if (!current.isValid()) return;
     next();
   };
@@ -2606,6 +2614,7 @@ const App = () => {
     // Cache stays. Just rewind to step 0.
     setDone(null);
     setStepIdx(0);
+    setContactPage(0);
     setErrors({});
   };
 
@@ -2615,6 +2624,7 @@ const App = () => {
     setData({ ...DEFAULT_DATA });
     setDone(null);
     setStepIdx(0);
+    setContactPage(0);
     setErrors({});
   };
 
@@ -2632,7 +2642,7 @@ const App = () => {
   }, [stepIdx, data, done]);
 
   // Smarter progress: completed steps / total. Reaches 100% only on submit.
-  const progress = (stepIdx / total) * 100;
+  const progress = ((stepIdx + (current && current.id === 'contact' && contactPage === 1 ? 0.5 : 0)) / total) * 100;
 
   // Detect if we have meaningful cached data (other than defaults)
   const hasCachedData = data.businessAge || data.sector || data.industry;
@@ -2671,8 +2681,8 @@ const App = () => {
           ) : (
             <>
               <div className="progress-meta">
-                <span><strong>Question {stepIdx + 1}</strong> of {total}</span>
-                <span>Onward</span>
+                <span><strong>Step {stepIdx + 1}</strong> of {total}</span>
+                <span>{Math.round(progress)}%</span>
               </div>
               <div className="progress-bar">
                 <div className="progress-fill" style={{ width: `${progress}%` }} />
@@ -2684,7 +2694,7 @@ const App = () => {
 
       <main className="main">
         {!done && started && StepComp && (
-          <div key={current.id} className="step">
+          <div key={current.id + '-' + contactPage} className="step">
             <StepComp data={data} set={set} next={next} errors={errors} />
           </div>
         )}
@@ -2703,7 +2713,7 @@ const App = () => {
                 onClick={handleNext}
                 disabled={!current.isValid() || submitting}
               >
-                {submitting ? <><span className="spinner" /> Sending...</> : (current.id === 'contact2' ? 'Get My Eligibility' : 'Continue')}
+                {submitting ? <><span className="spinner" /> Sending...</> : ((current.id === 'contact' && contactPage === 1) ? 'Get My Eligibility' : 'Continue')}
               </button>
             </div>
           </div>
