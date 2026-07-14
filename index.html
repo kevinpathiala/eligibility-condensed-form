@@ -2800,8 +2800,8 @@ ReactDOM.createRoot(document.getElementById('root')).render(<App />);
 (function reportHeight() {
   var last = 0;
   const measure = () => {
-    const el = document.getElementById('beehive-form');
-    return el ? Math.ceil(el.getBoundingClientRect().height) : 0;
+    const b = document.body, d = document.documentElement;
+    return Math.ceil(Math.max(b.scrollHeight, b.offsetHeight, d.scrollHeight, d.offsetHeight));
   };
   const send = () => {
     const h = measure();
@@ -2816,7 +2816,7 @@ ReactDOM.createRoot(document.getElementById('root')).render(<App />);
   }
   new MutationObserver(send).observe(document.body, { childList: true, subtree: true, attributes: true });
   window.addEventListener('resize', send);
-  send();
+  [0, 100, 300, 600, 1000].forEach((t) => setTimeout(send, t));
 })();
 
   </script>
