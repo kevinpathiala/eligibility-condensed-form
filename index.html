@@ -1135,7 +1135,10 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
   #beehive-form h1.q-title { font-size: 25px; line-height: 1.12; }
   #beehive-form .q-sub { font-size: 14.5px; margin-bottom: 18px; }
   #beehive-form .stepper { gap: 5px; }
-  #beehive-form .eyebrow { margin-bottom: 10px; }
+  #beehive-form .eyebrow { display: none; }
+  .card-head { margin-bottom: 18px; }
+  .card-head h2 { font-size: 24px; font-weight: 700; letter-spacing: -0.02em; line-height: 1.15; margin: 0 0 8px; color: var(--text); text-wrap: balance; }
+  .card-sub { font-size: 15px; color: var(--text-muted); line-height: 1.5; margin: 0; text-wrap: pretty; }
   @media (max-width: 520px) {
     #beehive-form { padding: 0; }
     #beehive-form .stage { padding: 22px 20px 20px !important; min-height: 500px; }
@@ -2345,8 +2348,18 @@ const StepLoan = ({ data, set }) => {
   );
 };
 
-// ===== STEP: Contact =====
-const StepContact = ({ data, set, errors }) => {
+// ===== STEP: Contact (part 1 — who) =====
+const StepContactA = ({ data, set, errors }) => (
+  <>
+    <h1 className="q-title">Let's start with your details</h1>
+    <p className="q-sub">Tell us who you are and your business.</p>
+    <TextField label="Your name" value={data.name} onChange={(v) => set({ name: v })} placeholder="First and last name" error={errors.name} autoFocus />
+    <TextField label="Business name" value={data.businessName} onChange={(v) => set({ businessName: v })} placeholder="Trading or legal name" error={errors.businessName} />
+  </>
+);
+
+// ===== STEP: Contact (part 2 — reach) =====
+const StepContactB = ({ data, set, errors }) => {
   const codeOptions = [
     { value: '+971', label: '🇦🇪 +971' },
     { value: '+968', label: '🇴🇲 +968' },
@@ -2357,11 +2370,8 @@ const StepContact = ({ data, set, errors }) => {
   ];
   return (
     <>
-      <div className="eyebrow"><span className="eyebrow-dot" />Almost there</div>
-      <h1 className="q-title">Where should we send your result?</h1>
+      <h1 className="q-title">How can we reach you?</h1>
       <p className="q-sub">A Beehive advisor will reach out within one working day.</p>
-      <TextField label="Your name" value={data.name} onChange={(v) => set({ name: v })} placeholder="First and last name" error={errors.name} autoFocus />
-      <TextField label="Business name" value={data.businessName} onChange={(v) => set({ businessName: v })} placeholder="Trading or legal name" error={errors.businessName} />
       <TextField label="Work email" type="email" inputMode="email" value={data.email} onChange={(v) => set({ email: v })} placeholder="you@business.com" error={errors.email} />
       <PhoneField label="Mobile number" codeValue={data.phoneCode} codeOptions={codeOptions} numberValue={data.phone} onCodeChange={(v) => set({ phoneCode: v })} onNumberChange={(v) => set({ phone: v })} error={errors.phone} />
 
@@ -2381,7 +2391,7 @@ const StepContact = ({ data, set, errors }) => {
 };
 
 Object.assign(window, {
-  StepAge, StepSectorIndustry, StepRevenue, StepLoan, StepContact,
+  StepAge, StepSectorIndustry, StepRevenue, StepLoan, StepContactA, StepContactB,
   formatAED, CURRENCY, FX_FROM_AED, ccyOf, fxOf, fmtMoneyForCountry,
 });
 
@@ -2431,6 +2441,19 @@ const validateContact = (data) => {
   const e = {};
   if (!data.name || data.name.trim().length < 2) e.name = 'Please enter your name';
   if (!data.businessName || data.businessName.trim().length < 2) e.businessName = 'Please enter your business name';
+  if (!data.email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.email)) e.email = 'Enter a valid email';
+  if (!data.phone || data.phone.replace(/\s/g, '').length < 6) e.phone = 'Enter a valid mobile number';
+  if (!data.terms) e.terms = 'Please accept the Terms and Privacy Policy to continue';
+  return e;
+};
+const validateContactA = (data) => {
+  const e = {};
+  if (!data.name || data.name.trim().length < 2) e.name = 'Please enter your name';
+  if (!data.businessName || data.businessName.trim().length < 2) e.businessName = 'Please enter your business name';
+  return e;
+};
+const validateContactB = (data) => {
+  const e = {};
   if (!data.email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.email)) e.email = 'Enter a valid email';
   if (!data.phone || data.phone.replace(/\s/g, '').length < 6) e.phone = 'Enter a valid mobile number';
   if (!data.terms) e.terms = 'Please accept the Terms and Privacy Policy to continue';
@@ -2533,7 +2556,8 @@ const App = () => {
     { id: 'sector', component: StepSectorIndustry, isValid: () => !!data.sector && !!data.industry },
     { id: 'revenue', component: StepRevenue, isValid: () => !!data.revenueTouched },
     { id: 'loan', component: StepLoan, isValid: () => !!data.loanTouched },
-    { id: 'contact', component: StepContact, isValid: () => Object.keys(validateContact(data)).length === 0 },
+    { id: 'contact', component: StepContactA, isValid: () => Object.keys(validateContactA(data)).length === 0 },
+    { id: 'contact2', component: StepContactB, isValid: () => Object.keys(validateContactB(data)).length === 0 },
   ]), [data]);
 
   const total = steps.length;
@@ -2573,7 +2597,7 @@ const App = () => {
   };
 
   const handleNext = () => {
-    if (current.id === 'contact') return handleSubmit();
+    if (current.id === 'contact2') return handleSubmit();
     if (!current.isValid()) return;
     next();
   };
@@ -2615,6 +2639,12 @@ const App = () => {
 
   return (
     <div className="stage">
+      {!done && stepIdx === 0 && (
+        <div className="card-head">
+          <h2>Your next round of growth starts here</h2>
+          <p className="card-sub">Check your eligibility for Beehive funding in a few quick steps.</p>
+        </div>
+      )}
       {!done && started && stepIdx > 0 && hasCachedData && (
         <div className="restart-row" style={{ display: 'none' }}>
           <button className="restart-btn" onClick={restart} title="Go back to the first step, keeping your answers">
@@ -2673,7 +2703,7 @@ const App = () => {
                 onClick={handleNext}
                 disabled={!current.isValid() || submitting}
               >
-                {submitting ? <><span className="spinner" /> Sending...</> : (current.id === 'contact' ? 'Get My Eligibility' : 'Continue')}
+                {submitting ? <><span className="spinner" /> Sending...</> : (current.id === 'contact2' ? 'Get My Eligibility' : 'Continue')}
               </button>
             </div>
           </div>
