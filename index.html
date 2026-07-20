@@ -1,7 +1,7 @@
 <!DOCTYPE html><html lang="en" style="--accent: #E00800;"><head>
-<!-- GTM intentionally NOT loaded inside the iframe.
-     Events are relayed to the parent (beehive.ae), whose GTM fires them once,
-     with the correct page context. Loading GTM here would double-count. -->
+<!-- GTM intentionally NOT loaded inside the iframe — it would load the same
+     container (GTM-WBNWW2X9) as the parent site and double-count submissions.
+     Events are relayed to the parent page's dataLayer via postMessage instead. -->
 
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
@@ -1178,23 +1178,7 @@
   </svg>
 </template>
 <body class="theme-light">
-  <!-- Receive UTMs (and the parent page URL) forwarded from the landing page -->
-  <script>
-  (function () {
-    var PARENT_ORIGIN = 'https://www.beehive.ae';
-    window.BEEHIVE_UTMS = {};
-    window.BEEHIVE_PARENT_URI = '';
-    try { window.BEEHIVE_UTMS = JSON.parse(sessionStorage.getItem('beehive_utms')) || {}; } catch (e) {}
-    window.addEventListener('message', function (e) {
-      if (e.origin !== PARENT_ORIGIN) return;
-      if (e.data && e.data.type === 'beehive_utms') {
-        window.BEEHIVE_UTMS = e.data.utms || {};
-        if (e.data.pageUri) window.BEEHIVE_PARENT_URI = e.data.pageUri;
-        try { sessionStorage.setItem('beehive_utms', JSON.stringify(window.BEEHIVE_UTMS)); } catch (e2) {}
-      }
-    });
-  })();
-  </script>
+  <!-- GTM noscript removed — container runs on the parent page, not the iframe -->
   <div id="beehive-form"><div id="root"></div></div>
 
   <script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
@@ -2497,13 +2481,12 @@ const submitToHubSpot = async (data, result) => {
     // Company object — the form has a required "Company name" field (0-2/name)
     { objectTypeId: '0-2', name: 'name', value: data.businessName },
   ];
-  // Attribution — UTMs forwarded from the parent landing page.
-  // (These contact properties must exist in HubSpot or the values are dropped.)
-  const utms = window.BEEHIVE_UTMS || {};
-  ['utm_source', 'utm_medium', 'utm_campaign', 'utm_content', 'utm_term'].forEach((k) => {
+  // Attach forwarded UTMs (from the parent landing page) as contact fields
+  const utms = window.beehiveUtms || {};
+  ['utm_source','utm_medium','utm_campaign','utm_content','utm_term'].forEach((k) => {
     if (utms[k]) fields.push({ objectTypeId: '0-1', name: k, value: utms[k] });
   });
-  const pageUri = window.BEEHIVE_PARENT_URI || window.location.href;
+  const pageUri = window.beehiveParentUri || window.location.href;
   const url = `https://api.hsforms.com/submissions/v3/integration/submit/${cfg.portalId}/${cfg.formGuid}`;
   const res = await fetch(url, {
     method: 'POST',
@@ -2856,10 +2839,19 @@ ReactDOM.createRoot(document.getElementById('root')).render(<App />);
       if (window.parent !== window) {
         window.parent.postMessage(
           { source: 'beehive-eligibility-form', event: eventName, params: params },
-          'https://www.beehive.ae'
+          '*'
         );
       }
     }
+
+    // Receive UTMs + parent page URL forwarded from the embed script
+    window.beehiveUtms = window.beehiveUtms || {};
+    window.addEventListener('message', function(e) {
+      if (e.data && e.data.type === 'beehive_utms') {
+        window.beehiveUtms = e.data.utms || {};
+        if (e.data.pageUri) window.beehiveParentUri = e.data.pageUri;
+      }
+    });
 
     // FORM START — first interaction with any field
     var started = false;
