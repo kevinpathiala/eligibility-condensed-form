@@ -2398,7 +2398,7 @@ Object.assign(window, {
 // ============================================================================
 window.HUBSPOT_CONFIG = {
   portalId: '2060720',
-  formGuid: '2e671895-4121-4572-9445-f45e0290230d',
+  formGuid: 'ed6cc43f-1e55-46f3-b8f4-3d5ab55f3fdd',
 };
 window.BEEHIVE_FIELD_MAP = {
   email: 'email',
@@ -2481,10 +2481,10 @@ const submitToHubSpot = async (data, result) => {
     // Company object — the form has a required "Company name" field (0-2/name)
     { objectTypeId: '0-2', name: 'name', value: data.businessName },
   ];
-  // Attach forwarded UTMs (from the parent landing page) as contact fields
+  // Attach any UTMs relayed from the parent page, if HubSpot has matching fields.
   const utms = window.beehiveUtms || {};
-  ['utm_source','utm_medium','utm_campaign','utm_content','utm_term'].forEach((k) => {
-    if (utms[k]) fields.push({ objectTypeId: '0-1', name: k, value: utms[k] });
+  ['utm_source', 'utm_medium', 'utm_campaign', 'utm_content', 'utm_term'].forEach((key) => {
+    if (utms[key]) fields.push({ objectTypeId: '0-1', name: key, value: utms[key] });
   });
   const pageUri = window.beehiveParentUri || window.location.href;
   const url = `https://api.hsforms.com/submissions/v3/integration/submit/${cfg.portalId}/${cfg.formGuid}`;
@@ -2551,6 +2551,31 @@ const App = () => {
   const [done, setDone] = useState(null);
   const [contactPage, setContactPage] = useState(0);
 
+  // Attach any UTMs relayed from the parent page (see postMessage listener below)
+  useEffect(() => {
+    const onUtms = (e) => {
+      if (e.data && e.data.type === 'beehive_utms') {
+        window.beehiveUtms = e.data.utms || {};
+      }
+    };
+    window.addEventListener('message', onUtms);
+    return () => window.removeEventListener('message', onUtms);
+  }, []);
+
+  // Track first interaction with any field on the current step
+  useEffect(() => {
+    if (!started) return;
+    const root = document.getElementById('beehive-form');
+    if (!root) return;
+    const onFirstInput = () => window.trackFormStart && window.trackFormStart();
+    root.addEventListener('input', onFirstInput, { once: true });
+    root.addEventListener('click', onFirstInput, { once: true });
+    return () => {
+      root.removeEventListener('input', onFirstInput);
+      root.removeEventListener('click', onFirstInput);
+    };
+  }, [started]);
+
   const steps = useMemo(() => ([
     { id: 'age', component: StepAge, isValid: () => !!data.businessAge },
     { id: 'sector', component: StepSectorIndustry, isValid: () => !!data.sector && !!data.industry },
@@ -2586,10 +2611,17 @@ const App = () => {
     setSubmitting(true);
     const result = qualifyLead(data);
     try {
-      await submitToHubSpot(data, result);
+      const res = await submitToHubSpot(data, result);
+      window.trackEvent && window.trackEvent('form_submit', { qualified: !!result.qualified });
+      if (res && res.ok) {
+        // GA4 recommended event name for lead-gen conversions — flag this as a
+        // Key Event in GA4 Admin > Events so it counts in conversion reports.
+        window.trackEvent && window.trackEvent('generate_lead', { qualified: !!result.qualified });
+      }
       setDone(result);
     } catch (err) {
       console.error('[Beehive] submit failed', err);
+      window.trackEvent && window.trackEvent('form_submit', { qualified: !!result.qualified, error: true });
       setDone(result);
     } finally {
       setSubmitting(false);
@@ -2597,15 +2629,18 @@ const App = () => {
   };
 
   const handleNext = () => {
+    window.trackFormStart && window.trackFormStart();
     if (current.id === 'contact') {
       if (contactPage === 0) {
         const v = validateContactA(data);
         if (Object.keys(v).length) { setErrors(v); return; }
+        window.trackEvent && window.trackEvent('form_step_complete', { step: 'contact_a', step_label: 'contact_details_1' });
         setContactPage(1); setErrors({}); return;
       }
       return handleSubmit();
     }
     if (!current.isValid()) return;
+    window.trackEvent && window.trackEvent('form_step_complete', { step: current.id, step_label: (window.STEP_LABELS && window.STEP_LABELS[current.id]) || current.id });
     next();
   };
 
@@ -2833,16 +2868,34 @@ ReactDOM.createRoot(document.getElementById('root')).render(<App />);
   <!-- Event tracking → GTM dataLayer + parent postMessage -->
   <script>
   (function() {
-    function track(eventName, params) {
-      window.dataLayer = window.dataLayer || [];
-      window.dataLayer.push(Object.assign({ event: eventName }, params));
+    var FORM_NAME = 'beehive_eand_eligibility';
+    window.dataLayer = window.dataLayer || [];
+    window.trackEvent = function(event, params) {
+      params = params || {};
+      var payload = Object.assign({ event: event, form_name: FORM_NAME }, params);
+      window.dataLayer.push(payload);
       if (window.parent !== window) {
         window.parent.postMessage(
-          { source: 'beehive-eligibility-form', event: eventName, params: params },
+          { source: 'beehive-eligibility-form', event: event, params: Object.assign({ form_name: FORM_NAME }, params) },
           '*'
         );
       }
-    }
+    };
+
+    var __formStarted = false;
+    window.trackFormStart = function() {
+      if (__formStarted) return;
+      __formStarted = true;
+      window.trackEvent('form_start');
+    };
+
+    window.STEP_LABELS = {
+      age: 'business_age',
+      sector: 'sector_industry',
+      revenue: 'annual_revenue',
+      loan: 'funding_amount',
+      contact: 'contact_details',
+    };
 
     // Receive UTMs + parent page URL forwarded from the embed script
     window.beehiveUtms = window.beehiveUtms || {};
@@ -2853,34 +2906,10 @@ ReactDOM.createRoot(document.getElementById('root')).render(<App />);
       }
     });
 
-    // FORM START — first interaction with any field
-    var started = false;
-    document.addEventListener('focusin', function(e) {
-      if (!started && e.target.matches('input, select, textarea')) {
-        started = true;
-        track('form_start', { form_name: 'funding_check_eligibility' });
-      }
-    });
-
-    // STEP COMPLETE + FORM SUBMIT
-    // This React form has no <form> element and re-renders its buttons, so we
-    // delegate clicks. The primary button advances each step ("Continue") and
-    // submits on the contact step ("Get My Eligibility"); "Begin" starts the flow.
-    document.addEventListener('click', function(e) {
-      var btn = e.target.closest('.btn-primary, .intro-cta');
-      if (!btn || btn.disabled) return;
-      var label = (btn.textContent || '').trim().toLowerCase();
-      if (label.indexOf('eligibility') !== -1) {
-        track('form_submit', { form_name: 'funding_check_eligibility' });
-      } else {
-        track('form_step_complete', { form_name: 'funding_check_eligibility', step: label || 'unknown' });
-      }
-    });
-
-    // DWELL TIME
+    // Dwell time — fires once each at 30s / 60s / 120s after load.
     [30000, 60000, 120000].forEach(function(ms) {
       setTimeout(function() {
-        track('dwell_time', { dwell_seconds: ms / 1000, page_path: 'funding-check-form' });
+        window.trackEvent('dwell_time', { dwell_seconds: ms / 1000, page_path: window.location.pathname });
       }, ms);
     });
   })();
