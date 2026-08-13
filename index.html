@@ -2431,6 +2431,18 @@ const qualifyLead = (data) => {
 };
 
 // ============================================================================
+// Digit length + leading-digit rules per country code
+const PHONE_RULES = {
+  '+971': { length: 9, startsWith: ['5'] },
+  '+968': { length: 8, startsWith: ['9', '7'] },
+};
+const isValidPhone = (code, phone) => {
+  const digits = (phone || '').replace(/\D/g, '');
+  const rule = PHONE_RULES[code];
+  if (!rule) return digits.length >= 7 && digits.length <= 12;
+  return digits.length === rule.length;
+};
+
 // Validation
 // ============================================================================
 const validateContact = (data) => {
@@ -2438,7 +2450,7 @@ const validateContact = (data) => {
   if (!data.name || data.name.trim().length < 2) e.name = 'Please enter your name';
   if (!data.businessName || data.businessName.trim().length < 2) e.businessName = 'Please enter your business name';
   if (!data.email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.email)) e.email = 'Enter a valid email';
-  if (!data.phone || data.phone.replace(/\s/g, '').length < 6) e.phone = 'Enter a valid mobile number';
+  if (!isValidPhone(data.phoneCode, data.phone)) e.phone = 'Enter a valid mobile number';
   if (!data.terms) e.terms = 'Please accept the Terms and Privacy Policy to continue';
   return e;
 };
@@ -2451,7 +2463,7 @@ const validateContactA = (data) => {
 const validateContactB = (data) => {
   const e = {};
   if (!data.email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.email)) e.email = 'Enter a valid email';
-  if (!data.phone || data.phone.replace(/\s/g, '').length < 6) e.phone = 'Enter a valid mobile number';
+  if (!isValidPhone(data.phoneCode, data.phone)) e.phone = 'Enter a valid mobile number';
   if (!data.terms) e.terms = 'Please accept the Terms and Privacy Policy to continue';
   return e;
 };
