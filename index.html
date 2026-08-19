@@ -254,6 +254,18 @@
     margin: 0 0 32px;
     text-wrap: pretty;
   }
+  .reassurance-note {
+    color: var(--text-muted);
+    font-size: 17px;
+    line-height: 1.5;
+    margin: 16px 0 0;
+    text-wrap: pretty;
+  }
+  .reassurance-note--footer {
+    margin: 14px 0 0;
+    text-align: center;
+    font-size: 14px;
+  }
 
   /* Card-style options */
   .options {
@@ -2293,7 +2305,7 @@ const StepRevenue = ({ data, set }) => {
     <>
       <div className="eyebrow"><span className="eyebrow-dot" />Trading volume</div>
       <h1 className="q-title">What is your average annual revenue?</h1>
-      <p className="q-sub">A rough figure is fine. Drag the slider to your typical year.</p>
+      <p className="q-sub"><strong>A rough figure is fine.</strong> Drag the slider to your typical year.</p>
       <Slider
         min={0}
         max={maxAED}
@@ -2767,6 +2779,8 @@ const App = () => {
                 {submitting ? <><span className="spinner" /> Sending...</> : ((current.id === 'contact' && contactPage === 1) ? 'Get My Eligibility' : 'Continue')}
               </button>
             </div>
+            {(current.id === 'revenue' || current.id === 'loan') && <p className="reassurance-note reassurance-note--footer">Only used to check your eligibility. Never shared.</p>}
+            {current.id === 'contact' && <p className="reassurance-note reassurance-note--footer">We won't spam you, just a contact to discuss your funding eligibility.</p>}
           </div>
         </div>
       )}
