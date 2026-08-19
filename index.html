@@ -2445,8 +2445,8 @@ const qualifyLead = (data) => {
 // ============================================================================
 // Digit length + leading-digit rules per country code
 const PHONE_RULES = {
-  '+971': { length: 9, startsWith: ['5'] },
-  '+968': { length: 8, startsWith: ['9', '7'] },
+  '+971': { length: 9 },
+  '+968': { length: 8 },
 };
 const isValidPhone = (code, phone) => {
   const digits = (phone || '').replace(/\D/g, '');
