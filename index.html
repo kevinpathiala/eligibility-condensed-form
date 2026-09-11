@@ -6,6 +6,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>Beehive — Business Eligibility Check</title>
+<script src="https://t.contentsquare.net/uxa/24e5fc3c98aa4.js" defer></script>
 
 <!--
   ============================================================================
@@ -2439,6 +2440,8 @@ const qualifyLead = (data) => {
   if (['<6', '6-12', '1-2'].includes(data.businessAge)) return { qualified: false, reason: 'age' };
   // Annual revenue must be at least 2M AED
   if (data.revenue < 2_000_000) return { qualified: false, reason: 'revenue' };
+  // We don't lend to tobacco/sheesha businesses
+  if (data.industry === 'TOBACCO') return { qualified: false, reason: 'industry' };
   return { qualified: true };
 };
 
