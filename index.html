@@ -1998,9 +1998,12 @@ const Slider = ({
   caption,
   format = (v) => v.toLocaleString(),
   formatBound,
+  scale,
 }) => {
   const clampedValue = Math.max(min, Math.min(max, value));
-  const pct = ((clampedValue - min) / (max - min)) * 100;
+  const pct = scale
+    ? (scale.toPos(clampedValue) / scale.maxPos) * 100
+    : ((clampedValue - min) / (max - min)) * 100;
   const fmtBound = formatBound || ((v) => `${prefix}${format(v)}${suffix}`);
   return (
     <div className="slider-wrap">
@@ -2012,11 +2015,11 @@ const Slider = ({
       {caption && <div className="slider-caption">{caption}</div>}
       <input
         type="range"
-        min={min}
-        max={max}
-        step={step}
-        value={clampedValue}
-        onChange={(e) => onChange(Number(e.target.value))}
+        min={scale ? 0 : min}
+        max={scale ? scale.maxPos : max}
+        step={scale ? 1 : step}
+        value={scale ? scale.toPos(clampedValue) : clampedValue}
+        onChange={(e) => onChange(scale ? scale.fromPos(Number(e.target.value)) : Number(e.target.value))}
       />
       <div className="slider-track-fill" style={{ width: `calc(${pct}% - ${pct * 0.28}px)` }} />
       <div className="slider-bounds">
@@ -2302,6 +2305,16 @@ const StepRevenue = ({ data, set }) => {
   // Stored in AED-equivalent (annual)
   const maxAED = 50_000_000;
   const stepAED = 250_000;
+  // Variable-speed scale: 0–2M in 50K, 2M–10M in 250K, 10M–50M in 1M steps
+  const revenueScale = {
+    maxPos: 112,
+    toPos: (v) => v <= 2_000_000 ? Math.round(v / 50_000)
+      : v <= 10_000_000 ? 40 + Math.round((v - 2_000_000) / 250_000)
+      : 72 + Math.round((v - 10_000_000) / 1_000_000),
+    fromPos: (p) => p <= 40 ? p * 50_000
+      : p <= 72 ? 2_000_000 + (p - 40) * 250_000
+      : 10_000_000 + (p - 72) * 1_000_000,
+  };
   return (
     <>
       <div className="eyebrow"><span className="eyebrow-dot" />Trading volume</div>
@@ -2311,10 +2324,11 @@ const StepRevenue = ({ data, set }) => {
         min={0}
         max={maxAED}
         step={stepAED}
+        scale={revenueScale}
         value={data.revenue}
         onChange={(v) => set({ revenue: v, revenueTouched: true })}
         prefix={`${ccy.symbol} `}
-        format={(v) => formatAED(v * fx)}
+        format={(v) => v >= maxAED ? `${formatAED(v * fx)}+` : formatAED(v * fx)}
         formatBound={(v) => v === maxAED ? `${ccy.symbol} ${formatAED(maxAED * fx)}+` : `${ccy.symbol} ${formatAED(v * fx)}`}
         caption="Drag to set your annual revenue"
       />
