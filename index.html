@@ -2300,8 +2300,8 @@ const StepRevenue = ({ data, set }) => {
   const ccy = ccyOf(data);
   const fx = fxOf(data);
   // Stored in AED-equivalent (annual)
-  const maxAED = 10_000_000;
-  const stepAED = 100_000;
+  const maxAED = 50_000_000;
+  const stepAED = 250_000;
   return (
     <>
       <div className="eyebrow"><span className="eyebrow-dot" />Trading volume</div>
@@ -2319,7 +2319,7 @@ const StepRevenue = ({ data, set }) => {
         caption="Drag to set your annual revenue"
       />
       <div className="chips">
-        {[2_000_000, 5_000_000, 10_000_000].map((v) => (
+        {[2_000_000, 5_000_000, 10_000_000, 25_000_000, 50_000_000].map((v) => (
           <button key={v} type="button" className={`chip ${data.revenueTouched && data.revenue === v ? 'active' : ''}`} onClick={() => set({ revenue: v, revenueTouched: true })}>{`${ccy.symbol} ${formatAED(v * fx)}${v === maxAED ? '+' : ''}`}</button>
         ))}
       </div>
